@@ -1,0 +1,13 @@
+name: jax-framework
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - ipykernel
+  - pip:
+    - matplotlib
+    - numpy
+    - jax[cpu]
+    - jupyterlab
+    - tensorflow-datasets
+
