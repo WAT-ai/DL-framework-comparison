@@ -7,4 +7,9 @@ Update conda environment:
 ```
 conda env update --file environment.yml
 ```
+## Benchmarking and Profiling 
 
+To view a trace and some stats, open tensorboard with: 
+```
+tensorboard --logdir /tmp/tensorboard/
+```

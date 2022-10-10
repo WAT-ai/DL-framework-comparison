@@ -10,4 +10,7 @@ dependencies:
     - jax[cpu]
     - jupyterlab
     - tensorflow-datasets
+    - toml
+    - tensorflow
+    - tbp-nightly
 
