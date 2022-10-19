@@ -1,26 +1,19 @@
+import os
 import time
-import jax.numpy as jnp
-from jax import grad, jit, vmap
-from jax import random
+import logging
+import jax
+import mlp
 
-# For benchmarking and logging
-import jax.profiler
+# Suppress warning and info messages from jax 
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
-# Start server to connect to tensorboard
-jax.profiler.start_trace("/tmp/tensorboard")
+def main():
 
-time.sleep(2)
+    print(f"\nEnvironment Config: ")
+    print(f"TF_CPP_MIN_LOG_LEVEL = {os.environ['TF_CPP_MIN_LOG_LEVEL']}")
 
-print("Jax Frameworks...")
-key = random.PRNGKey(0)
-x = random.normal(key, (10,))
-print(x)
+    layers = [784, 100, 10]
+    model = mlp.MLPModel(layers, learning_rate=0.01, log_level=logging.INFO)
 
-# Run the operations to be profiled
-key = jax.random.PRNGKey(0)
-x = jax.random.normal(key, (5000, 5000))
-y = x @ x
-y.block_until_ready()
-print(y)
-
-jax.profiler.stop_trace()
+if __name__ == "__main__":
+    main()
