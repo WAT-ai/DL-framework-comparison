@@ -1,8 +1,7 @@
 import os
-import time
-import logging
-import jax
 import mlp
+import json
+import numpy as np
 import jax.numpy as jnp
 import tensorflow_datasets as tfds
 
@@ -37,6 +36,8 @@ def load_datasets():
 
     print('Train:', train_images.shape, train_labels.shape)
     print('Test:', test_images.shape, test_labels.shape)
+    print('num_pixels:', num_pixels)
+    print('num_labels:', num_labels)
 
     return train_images, train_labels, test_images, test_labels, num_labels, num_pixels
 
@@ -50,6 +51,25 @@ def get_train_batches(batch_size):
     
     # tfds.dataset_as_numpy converts the tf.data.Dataset into an iterable of NumPy arrays
     return tfds.as_numpy(ds)
+
+def create_batch_ds(ds, num_labels, num_pixels):
+
+    dataset = []
+    for x, y in ds:
+        x = jnp.reshape(x, (len(x), num_pixels))
+        y = mlp.one_hot_encoder(y, num_labels)
+
+        for batch in zip(x,y):
+            dataset.append(batch)
+
+    dataset = np.array(dataset)
+    print(f"dataset: {dataset.shape}")
+    print(f"dataset[0]: {dataset[0].shape}")
+    print(f"dataset[0][0]: {dataset[0][0].shape}")
+    print(f"dataset[0][1]: {dataset[0][1].shape}")
+
+    return dataset
+   
 
 def main():
 
@@ -69,7 +89,29 @@ def main():
     ds = get_train_batches(batch_size)
 
     # Train model
-    mlp.train(model.params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=epochs)
+    metrics = mlp.train(model.params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=epochs)
+
+    # Compute batch inference time
+    batch_inf = mlp.compute_inference_batch(model.params, ds)
+    metrics["average_batch_inference_time"] = batch_inf * 1000 # Convert to ms
+
+    # Add other info 
+    metrics["model_name"] = "MLP"
+    metrics["framework_name"] = "Jax"
+    metrics["dataset"] = "MNIST Digits"
+    metrics["task"] = "classification"
+
+    # Export to JSON
+    print(f"\nTraining Metrics: \n{metrics}")
+    with open("milestone1-jax-mlp.json", "w") as outfile:
+        json.dump(metrics, outfile)
+
+    # Additional metrics - not included
+    # Create batched dataset
+    # bds = create_batch_ds(ds, num_labels, num_pixels)
+
+    # Compute other metrics
+    # mlp.compute_inference(model.params, bds)
 
 if __name__ == "__main__":
     main()
