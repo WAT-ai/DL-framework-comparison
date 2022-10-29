@@ -1,1 +1,0 @@
-{"total_training_time": 11.421262502670288, "average_epoch_training_time": 0.9361116647720337, "final_training_loss": 0.009684923104941845, "final_evaluation_accuracy": 0.968999981880188, "average_batch_inference_time": 6.4640787364577434, "model_name": "MLP", "framework_name": "Jax", "dataset": "MNIST Digits", "task": "classification"}
