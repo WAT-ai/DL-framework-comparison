@@ -1,5 +1,4 @@
 import os
-import mlp
 import json
 import time
 import numpy as np
@@ -81,14 +80,20 @@ def predict(params, input):
     final_w, final_b = params[-1]
     logits = jnp.dot(final_w, activations) + final_b
     
-    return logits - logsumexp(logits)
+    # Compute log softmax loss
+    loss = logits - logsumexp(logits)
+
+    return loss
 
 # Temp, move this
 batched_predict = vmap(predict, in_axes=(None, 0))
 
 def loss(params, inputs, targets):
     """
-    Compute loss
+    Computes negative log likehood loss. 
+
+    Each prediction of batched_predict retuns the log softmax loss.
+    Computing the mean and returning the mean is this form of loss. 
     """
     preds = batched_predict(params, inputs)
     loss = -jnp.mean(preds * targets)
@@ -98,7 +103,7 @@ def loss(params, inputs, targets):
 @jit
 def update(params, x, y, learning_rate):
     """
-    Perform backpropagation
+    Perform backpropagation using stochastic gradient descent.
     """
     grads = grad(loss)(params, x, y)
 
@@ -213,12 +218,12 @@ def load_datasets():
     # # Full train set
     train_images, train_labels = train_data['image'], train_data['label']
     train_images = jnp.reshape(train_images, (len(train_images), num_pixels))
-    train_labels = mlp.one_hot_encoder(train_labels, num_labels)
+    train_labels = one_hot_encoder(train_labels, num_labels)
 
     # # Full test set
     test_images, test_labels = test_data['image'], test_data['label']
     test_images = jnp.reshape(test_images, (len(test_images), num_pixels))
-    test_labels = mlp.one_hot_encoder(test_labels, num_labels)
+    test_labels = one_hot_encoder(test_labels, num_labels)
 
     print('Train:', train_images.shape, train_labels.shape)
     print('Test:', test_images.shape, test_labels.shape)
@@ -243,7 +248,7 @@ def create_batch_ds(ds, num_labels, num_pixels):
     dataset = []
     for x, y in ds:
         x = jnp.reshape(x, (len(x), num_pixels))
-        y = mlp.one_hot_encoder(y, num_labels)
+        y = one_hot_encoder(y, num_labels)
 
         for batch in zip(x,y):
             dataset.append(batch)
@@ -255,7 +260,7 @@ def create_batch_ds(ds, num_labels, num_pixels):
     print(f"dataset[0][1]: {dataset[0][1].shape}")
 
     return dataset
-   
+
 
 def main():
 
@@ -267,18 +272,18 @@ def main():
     batch_size = 128
     epochs = 10
     n_targets = 10
-    learning_rate = 0.01
-    model = mlp.MLPModel(layers, learning_rate=learning_rate, batch_size=batch_size, num_epochs=epochs, n_targets=n_targets)
+    learning_rate = 0.001
+    model = MLPModel(layers, learning_rate=learning_rate, batch_size=batch_size, num_epochs=epochs, n_targets=n_targets)
 
     # Load Data 
     train_images, train_labels, test_images, test_labels, num_labels, num_pixels = load_datasets()
     ds = get_train_batches(batch_size)
 
     # Train model
-    metrics = mlp.train(model.params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=epochs)
+    metrics = train(model.params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=epochs)
 
     # Compute batch inference time
-    batch_inf = mlp.compute_inference_batch(model.params, ds)
+    batch_inf = compute_inference_batch(model.params, ds)
     metrics["average_batch_inference_time"] = batch_inf * 1000 # Convert to ms
 
     # Add other info 
