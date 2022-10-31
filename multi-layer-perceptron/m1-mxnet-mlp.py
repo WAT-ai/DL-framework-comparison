@@ -18,7 +18,7 @@ Data: MNIST handwritten digits
 
 Hyperparameters:
 - Optimizer: Adam
-- learning rate: 1e-4
+- learning rate: 1e-3
 - beta_1: 0.9
 - beta_2: 0.999
 - Number of epochs for training: 10
