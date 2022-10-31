@@ -38,7 +38,7 @@ Metrics to record:
 import mxnet as mx
 from mxnet import gluon, autograd as ag, nd
 import numpy as np
-
+from math import ceil 
 import time # for benchmark measurements 
 
 # json library neded to export metrics 
@@ -96,20 +96,14 @@ net.initialize()
 trainer= gluon.Trainer(net.collect_params(), 'adam', optimizer_params = {'learning_rate': 0.001, 'beta1': 0.9, 'beta2': 0.999})
 
 
+
 ## Model training
 
-
 # Initializing time related variables and lists (to make it easier for metric outputs)
-tic = time.thread_time()
-# time list vars for epoch times
-tick = []
-timer = []
-tick.append(time.thread_time()-tic)
 
-# time list vars for batch inference time
-b_tick = []
-b_timer = []
-b_tick.append(time.thread_time()-tic)
+# initializing the training times
+tic_total_train = time.time()
+epoch_times = []
 
 epoch = 10
 num_examples = X_train.shape[0]
@@ -122,10 +116,13 @@ softmax_ce = gluon.loss.SoftmaxCrossEntropyLoss(sparse_label=False)
 
 
 for i in range(epoch):
+    tic_train_epoch = time.time()
     # creating a cumulative loss variable
     cum_loss = 0
     # Reset the train Data Iterator.
     train_data.reset()
+
+
     # Loop over the training Data Tterator.
     for batch in train_data:
         # Splits train data and its labels into multiple slices
@@ -151,7 +148,6 @@ for i in range(epoch):
 
                 # summation of the loss (will be divided by the sample_size at the end of the epoch)
                 cum_loss += nd.sum(loss).asscalar()
-        
         # Decoding the 1H encoded data 
         # (this is IMPORTANT since it affects the input shape and will give an error)
         # metric.update takes inputs of a list of ND array so it is to be as type list 
@@ -162,63 +158,69 @@ for i in range(epoch):
         # Make one step of parameter update. Trainer needs to know the
         # batch size of data to normalize the gradient by 1/batch_size.
         trainer.step(batch.data[0].shape[0])
-        b_tick.append(time.thread_time()-tic)
-        b_timer.append(b_tick[-1]-b_tick[-2])
     
     # Gets the evaluation result.
     name, acc = metric.get()  
-
-    # evaluating the time elapsed between one epoch
-    tick.append(time.thread_time()-tic)
-    timer.append(tick[-1]-tick[-2])
-
-    # resetting the accuracy metric for next epoch
     metric.reset()
-    print("Epoch %s | Loss: %.6f, Train_acc: %.6f, in %.2fs" %
-    (i+1, cum_loss/num_examples, acc, timer[i]))
-print("-"*70)
- 
+    toc_train_epoch = time.time()
+    epoch_times.append(toc_train_epoch - tic_train_epoch)
+    
 
- ## Model validation
+    ## Validation accuracy measuremetn
+    
+    # Reseting the validation Data Iterator
+    tic_eval = time.time() # initializing the evaluation timer
+    val_data.reset()
 
- # Reseting the validation Data Iterator
-val_data.reset()
+    # Loop over the validation Data Iterator.
+    for batch in val_data:
+        # Splits val data and its labels into multiple slices
+        data = gluon.utils.split_data(batch.data[0], batch_axis=0, num_slice = 1)
+        label = gluon.utils.split_data(batch.label[0], batch_axis=0, num_slice = 1)
 
-# Loop over the validation Data Iterator.
-for batch in val_data:
-    # Splits val data and its labels into multiple slices
-    data = gluon.utils.split_data(batch.data[0], batch_axis=0, num_slice = 1)
-    label = gluon.utils.split_data(batch.label[0], batch_axis=0, num_slice = 1)
+        # Initializing the model output var
+        val_outputs = []
+        for x in data:
+            val_outputs.append(net(x))
 
-    # Initializing the model output var
-    outputs = []
-    for x in data:
-        outputs.append(net(x))
-
-    # Evaluating the accuracy of the model based on val batch datasets
-    label = [np.argmax(mx.nd.array(label[0]), axis = 1)]
-    metric.update(label, outputs)
+        # Evaluating the accuracy of the model based on val batch datasets
+        val_label = [np.argmax(mx.nd.array(label[0]), axis = 1)]
+        metric.update(val_label, val_outputs)
 
     # metric.get ouputs as (label, value), so will use val_acc[1]
     name, val_acc = metric.get()
-# assert metric.get()[1] > 0.94
+
+    metric.reset()
+    
+    # evaluating the time elapsed between the evaluation
+    toc_eval = time.time()
+    
+
+    # resetting the accuracy metric for next epoch
+    print("Epoch %s | Loss: %.6f, Train_acc: %.6f, Val_acc: %.6f, in %.2fs" %
+    (i+1, cum_loss/num_examples, acc, val_acc, epoch_times[i]))
+print("-"*70)
+toc_total_train = time.time() # total training time
+ 
 
 ## Metrics export to JSON
+# export JSON file 
 metrics = {
     'model_name': 'MLP',
     'framework_name': 'MxNet',
     'dataset': 'MNIST Digits',
     'task': 'classification',
-    'total_training_time': np.sum(timer), 
-    'average_epoch_training_time': np.average(timer), 
-    'average_batch_inference_time': np.average(b_timer)*1000,
+    'total_training_time': toc_total_train - tic_total_train, 
+    'average_epoch_training_time': np.average(epoch_times), 
+    'average_batch_inference_time': 1000*np.average(toc_eval - tic_eval)/ceil(val_data.num_data/val_data.batch_size),
     'final_training_loss': cum_loss/num_examples, 
-    'final_evaluation_accuracy': val_acc
+    'final_evaluation_accuracy': val_acc 
 }
 
-# print(metrics)
+print(metrics)
 
 with open('m1-mxnet-mlp.json', 'w') as outfile:
     json.dump(metrics, outfile)
+
 
 
