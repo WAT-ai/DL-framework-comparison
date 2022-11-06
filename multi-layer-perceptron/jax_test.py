@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import optax
 import numpy as np
 import jax.numpy as jnp
 import tensorflow_datasets as tfds
@@ -100,7 +101,6 @@ def loss(params, inputs, targets):
 
     return loss
 
-@jit
 def update(params, x, y, learning_rate):
     """
     Perform backpropagation using stochastic gradient descent.
@@ -108,6 +108,17 @@ def update(params, x, y, learning_rate):
     grads = grad(loss)(params, x, y)
 
     return [(w - learning_rate * dw, b - learning_rate * db) for (w, b), (dw, db) in zip(params, grads)]
+
+def update_adam(params, x, y, opt_state, optimizer):
+    """
+    Perform backpropagation using adam optimizer.
+    """
+    
+    grads = grad(loss)(params, x, y)
+    updates, opt_state = optimizer.update(grads, opt_state)
+    params = optax.apply_updates(params, updates)
+    
+    return params, opt_state
 
 def accuracy(params, inputs, targets):
     """
@@ -119,12 +130,23 @@ def accuracy(params, inputs, targets):
     
     return jnp.mean(predicted_class == target_class)
 
-def train(params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=10, debug=False):
-    print("\nTraining Model...")
+def train(params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=10, debug=False, use_optimizer='sgd'):
+    """
+    Either set use_optimizer to be adam ('adam') or standard stocastic gradient desent ('sgd'). 
+    """
+    print(f"\nTraining Model using ({use_optimizer})...")
 
+    if use_optimizer == 'adam':
+
+        # define the adam optimizer
+        optimizer = optax.adam(learning_rate, b1=0.9, b2=0.999)
+
+        # Initialize parameters of the model + optimizer.
+        opt_state = optimizer.init(params)
+
+    # metrics and tracking
     training_metrics = {}
     ts = time.time()
-
     epoch_times = []
 
     for epoch in tqdm(range(epochs)):
@@ -135,7 +157,12 @@ def train(params, ds, train_images, train_labels, test_images, test_labels, num_
         for x, y in ds:
             x = jnp.reshape(x, (len(x), num_pixels))
             y = one_hot_encoder(y, num_labels)
-            params = update(params, x, y, learning_rate)
+
+            # default to stochastic gradient descent 
+            if use_optimizer == 'adam':
+                params, opt_state = update_adam(params, x, y, opt_state, optimizer)
+            else:
+                params = update(params, x, y, learning_rate)
         
         epoch_time = time.time() - start_time
         epoch_times.append(epoch_time)
@@ -172,7 +199,6 @@ def compute_inference(params, ds):
         dt = time.time() - ts
 
         inf_times.append(dt)
-        # print(f"prediction: {jnp.argmax(res)}, actual: {jnp.argmax(batch[1])}")
 
     inf_times = np.array(inf_times)
     mean_inf = inf_times.mean()
@@ -280,7 +306,7 @@ def main():
     ds = get_train_batches(batch_size)
 
     # Train model
-    metrics = train(model.params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=epochs)
+    metrics = train(model.params, ds, train_images, train_labels, test_images, test_labels, num_labels, num_pixels, learning_rate, epochs=epochs, use_optimizer='adam')
 
     # Compute batch inference time
     batch_inf = compute_inference_batch(model.params, ds)
