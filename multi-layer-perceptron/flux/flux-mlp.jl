@@ -40,7 +40,7 @@ function main()
         Dense(100, nclasses))
     
     ## Default is already (0.9, 0.999)
-    opt = ADAM(1e-4)
+    opt = ADAM(1e-3)
     
     loss_func(x, y)= logitcrossentropy(model(x), y)
     
