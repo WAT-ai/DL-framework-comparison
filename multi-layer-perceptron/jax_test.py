@@ -166,11 +166,11 @@ def train(params, ds, train_images, train_labels, test_images, test_labels, num_
         
         epoch_time = time.time() - start_time
         epoch_times.append(epoch_time)
-
-        train_acc = accuracy(params, train_images, train_labels)
-        test_acc = accuracy(params, test_images, test_labels)
         
         if debug: 
+            train_acc = accuracy(params, train_images, train_labels)
+            test_acc = accuracy(params, test_images, test_labels)
+            
             print("Epoch {} in {:0.2f} sec".format(epoch, epoch_time))
             print("Training set accuracy {}".format(train_acc))
             print("Test set accuracy {}".format(test_acc))
