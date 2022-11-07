@@ -1,42 +1,27 @@
 using MLDatasets: MNIST
-using Knet, IterTools, MLDatasets
+using Knet, IterTools
 using Dictionaries
-using TimerOutputs
 using TimerOutputs
 using JSON
 using Printf
-using Knet:minibatch
-using Knet:minimize
-using Knet
-using Knet: Param
-using Knet: Knet, dir, accuracy, progress, sgd, gc, Data, nll, relu
 using Flatten
-using Flux.Data;
 using Flux, Statistics
 
 # This loads the MNIST handwritten digit recognition dataset. This code is based off the Knet Tutorial Notebook. 
 xtrn,ytrn = MNIST.traindata(Float32)
 xtst,ytst = MNIST.testdata(Float32)
-println.(summary.((xtrn,ytrn,xtst,ytst)));
+
 
 xtrn = reshape(xtrn, 784, 60000 ) 
 xtst = reshape(xtst, 784, 10000 )
-println(summary.((xtrn, xtst))) # can see the data that is flattened 
 
-#Preprocessing targets: one hot vectors
+
+#Preprocessing targets: one hot vectors, commented this out, as this does not correctly with KNet 
 # ytrn = onehotbatch(ytrn, 0:9)
 # ytst = onehotbatch(ytst, 0:9)
 
 train_loader = DataLoader((xtrn, ytrn), batchsize=128);
 test_loader = DataLoader((xtst, ytst), batchsize = 128)
-
-length(test_loader)
-
-
-
-(x,y) = first(train_loader) #gives the first minibatch from training dataset
-println.(summary.((x,y)));
-
 
 
 
@@ -52,7 +37,6 @@ struct Chain; layers; end
 
 model = Chain((Dense1(784, 100), Dense1(100, 10), identity))
 
-model(x) #checking if training is working
 
 
 loss(xtst, ytst) = nll(model(xtst), ytst)
@@ -116,7 +100,7 @@ metrics = Dict("model_name" => "MLP",
 
 stringdata = JSON.json(metrics)
 
-#will allow the metrics to be entered into a file 
+#will allow the metrics to be entered into a JSON file, which can be checked 
 
 open("M1-Knet-mlp.json", "w") do f
     write(f, stringdata)
