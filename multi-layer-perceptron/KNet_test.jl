@@ -16,7 +16,7 @@ xtrn = reshape(xtrn, 784, 60000 )
 xtst = reshape(xtst, 784, 10000 )
 
 
-#Preprocessing targets: one hot vectors, commented this out, as this does not correctly with KNet 
+#Preprocessing targets: one hot vectors, commented this out, as this does not work correctly with KNet 
 # ytrn = onehotbatch(ytrn, 0:9)
 # ytst = onehotbatch(ytst, 0:9)
 
