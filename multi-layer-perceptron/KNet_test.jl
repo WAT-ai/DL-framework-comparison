@@ -1,10 +1,15 @@
 using MLDatasets: MNIST
-using Knet, IterTools
+using Knet, IterTools, MLDatasets
 using Dictionaries
 using TimerOutputs
 using JSON
 using Printf
+using Knet:minibatch
+using Knet:minimize
+using Knet: Param
+using Knet: dir, accuracy, progress, sgd, gc, Data, nll, relu
 using Flatten
+using Flux.Data;
 using Flux, Statistics
 
 # This loads the MNIST handwritten digit recognition dataset. This code is based off the Knet Tutorial Notebook. 
