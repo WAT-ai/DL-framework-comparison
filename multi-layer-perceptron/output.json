@@ -1,0 +1,1 @@
+{"model_name": "MLP", "framework_name": "TensorFlow", "dataset": "MNIST Digits", "task": "classification", "Total Training Time": 7.376441955566406, "Average Epoch Training Time": 0.1238476037979126, "Average Batch Inference Time": 0.025683188997606226}
