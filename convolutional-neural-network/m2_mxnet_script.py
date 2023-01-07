@@ -47,7 +47,7 @@ Data: CIFAR-10
      - Depending on data source, scale int8 inputs to [0, 1] by dividing by 255
      - ImageNet normalization 
           - From the RGB channels, subtract means [0.485, 0.456, 0.406] and divide by standard deviations [0.229, 0.224, 0.225]
-     - 4 pixel padding on the side, then apply 32x32 crop randomly sampled from the padded image or its horizontal flip as in Section 3.2 of [3]
+     - 4 pixel padding on EACH side (40x40), then apply 32x32 crop randomly sampled from the padded image or its horizontal flip as in Section 3.2 of [3]
 - Preprocessing labels: Use integer indices
 
 Hyperparameters:
@@ -368,7 +368,7 @@ def get_metrics(tic_total_train, toc_total_train, tic_val, toc_val, epoch_times,
 # As mentioned in the notebook transform_train will be used on both train_data and cv_data, while transform_test will be used on test_data. Since training
 # dataset provides more randomized data (and should be more generalizable), I will not be performing the random operations on the testing dataset.
 
-transform_train = transforms.Compose([ gcv_transforms.RandomCrop(32, pad=2), # Randomly crop an area and resize it to be 32x32, then pad it to be 36x36 
+transform_train = transforms.Compose([ gcv_transforms.RandomCrop(32, pad=4), # Randomly crop an area and resize it to be 32x32, then pad it to be 40x40
                                     transforms.RandomFlipLeftRight(), # Applying a random horizontal flip
                                     transforms.ToTensor(), # Transpose the image from height*width*num_channels to num_channels*height*width
                                                            # and map values from [0, 255] to [0,1]
@@ -386,10 +386,15 @@ poc_train_ds = full_train_ds[0:1024] # Use this as the train ds if showcasing pr
 
 # Splitting data and Loading into DataLoader
 
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------#
+
 # IMPORTANT: COMMENT/UNCOMMENT whichever line you need (one will be for full dataset and the other if using for proof of concept)
+
 # train_data, cv_data, test_data, batch_size , train_size, cv_size = data_split_and_load(full_train_ds, test_ds) # UNCOMMENT WHEN USING FULL DATASET
 train_data, cv_data, test_data, batch_size, train_size, cv_size = data_split_and_load(poc_train_ds, test_ds, batch_size = 64) # UNCOMMENT WHEN SHOWING PROOF OF CONCEPT
 
+# ------------------------------------------------------------------------------------------------------------------------------------------------------------------#
 
 
 # initializing network and loading into the trainer
