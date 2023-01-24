@@ -158,3 +158,6 @@ Manifest.toml
 # json files 
 *.json
 
+data
+models
+
