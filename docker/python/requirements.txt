@@ -1,0 +1,35 @@
+--extra-index-url https://download.pytorch.org/whl/cu114
+--find-links https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+
+# Python general
+tqdm
+more-itertools
+toml
+
+# Numeric computing
+numpy
+pandas
+scipy
+scikit-learn
+matplotlib
+
+# Jupyter
+jupyterlab
+ipywidgets
+
+# Using Docker image with CUDA 11.4 and cuDNN 8.3
+# Jax install, compatible with cuDNN 8.2 and CUDA 11
+jax[cuda11_cudnn82]
+optax
+flax
+
+# Torch install, compaible with CUDA 11.4 from wheel index
+torch
+torchvision
+
+# Tensorflow install, compatible up to CUDA 11.2 with cuDNN 8
+tensorflow
+tensorflow-datasets
+
+# MxNet install, compatible with CUDA 11.2
+mxnet-cu112

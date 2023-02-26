@@ -1,0 +1,47 @@
+# syntax=docker/dockerfile:1
+
+FROM nvidia/cuda:11.4.2-cudnn8-devel-ubuntu20.04
+
+ARG JULIA_RELEASE=1.8
+ARG JULIA_VERSION=1.8.5
+
+# Install prerequesites
+RUN apt-get update && apt-get install -y openssh-client git htop nano sudo task-spooler
+
+# Install Julia
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get install --yes --no-install-recommends \
+                    # basic stuff
+                    curl ca-certificates && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -s -L https://julialang-s3.julialang.org/bin/linux/x64/${JULIA_RELEASE}/julia-${JULIA_VERSION}-linux-x86_64.tar.gz | \
+    tar -C /usr/local -x -z --strip-components=1 -f -
+
+# Install packages
+COPY Project.toml Manifest.toml /usr/local/share/julia/environments/v${JULIA_RELEASE}/
+
+RUN JULIA_DEPOT_PATH=/usr/local/share/julia \
+    julia -e 'using Pkg; Pkg.instantiate(); Pkg.API.precompile()'
+
+# Git setup
+RUN git config --global --add safe.directory '*' \
+    && mkdir -p -m 0700 ~/.ssh \
+    && ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+# Clone our repository
+RUN --mount=type=ssh git clone git@github.com:WAT-ai/DL-framework-comparison.git
+
+# Make a new root user named vscode to allow for vscode-server install
+ARG USERNAME=vscode
+RUN useradd -rm -d /home/$USERNAME -s /bin/bash -g root -G sudo -u 1001 $USERNAME
+USER $USERNAME
+RUN mkdir -p /home/$USERNAME/.vscode-server/extensions \
+        /home/$USERNAME/.vscode-server-insiders/extensions
+
+USER root
+WORKDIR /root
+
+CMD ["bash"]

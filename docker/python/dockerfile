@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+
+FROM nvidia/cuda:11.4.2-cudnn8-devel-ubuntu20.04
+
+# Install prerequesites
+RUN apt-get update && apt-get install -y python3 python3-pip openssh-client git htop nano sudo task-spooler
+
+COPY requirements.txt requirements.txt
+RUN pip3 install --upgrade pip \
+    && pip3 --no-cache-dir install -r requirements.txt
+
+# Git setup
+RUN git config --global --add safe.directory '*' \
+    && mkdir -p -m 0700 ~/.ssh \
+    && ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+# Clone our repository
+RUN --mount=type=ssh git clone git@github.com:WAT-ai/DL-framework-comparison.git
+
+# Make a new root user named vscode to allow for vscode-server install
+ARG USERNAME=vscode
+RUN useradd -rm -d /home/$USERNAME -s /bin/bash -g root -G sudo -u 1001 $USERNAME
+USER $USERNAME
+RUN mkdir -p /home/$USERNAME/.vscode-server/extensions \
+        /home/$USERNAME/.vscode-server-insiders/extensions
+
+USER root
+WORKDIR /root
+
+CMD ["bash"]
