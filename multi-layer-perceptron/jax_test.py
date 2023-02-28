@@ -48,7 +48,7 @@ from jax.scipy.special import logsumexp
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Specify directory for data 
-DATA_DIR = './datasets'
+DATA_DIR = './data'
 
 class MLPModel:
 
@@ -354,7 +354,7 @@ def main():
 
     # Export to JSON
     print(f"\nTraining Metrics: \n{metrics}")
-    with open("milestone1-jax-mlp.json", "w") as outfile:
+    with open(f"m1-jax-mlp.json", "w") as outfile:
         json.dump(metrics, outfile)
 
     # Additional metrics - not included
