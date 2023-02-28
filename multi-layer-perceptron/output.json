@@ -1,1 +1,0 @@
-{"model_name": "MLP", "framework_name": "TensorFlow", "dataset": "MNIST Digits", "task": "classification", "Total Training Time": 9.389873266220093, "Final Training Loss": 1.0210097339004278, "Final Evaluation Accuracy": 97.1313339471817, "Average Epoch Training Time": 0.0013297557830810546, "Average Batch Inference Time": 1.0042100013056887}
