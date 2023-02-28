@@ -18,8 +18,8 @@ function main()
     time_outputs = TimerOutput()
     json_result = Dict()
     
-    xtrain, ytrain = MLDatasets.MNIST.traindata(Float32)
-    xtest, ytest = MLDatasets.MNIST.testdata(Float32)
+    xtrain, ytrain = MLDatasets.MNIST(split=:train)[:]
+    xtest, ytest = MLDatasets.MNIST(split=:test)[:]
     
     # Reshape Data in order to flatten each image into a linear array
     xtrain = Flux.flatten(xtrain)
@@ -69,7 +69,7 @@ function main()
     json_result["final_training_loss"] = loss_func(xtest, ytest)
     json_result["final_evaluation_accuracy"] = accuracy(test_data, model)
     
-    open("foo.json","w") do f
+    open("m1-flux-mlp.json","w") do f
         JSON.print(f, json_result)
     end
 end
