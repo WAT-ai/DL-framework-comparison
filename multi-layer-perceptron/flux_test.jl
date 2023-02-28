@@ -1,9 +1,7 @@
 # Flux.jl implementation of multi-layer perceptron
 using Flux, Statistics
 using Flux.Data: DataLoader
-using Flux: onehotbatch, onecold, logitcrossentropy, throttle, @epochs
-using Base.Iterators: repeated
-using Parameters: @with_kw
+using Flux: onehotbatch, onecold, logitcrossentropy
 using MLDatasets
 using JSON
 using TimerOutputs
