@@ -74,7 +74,8 @@ def main():
         def on_test_batch_end(self, batch, logs={}):
             self.endtime = time.time()
             self.end_batch_interference_list.append(self.endtime)
-            self.difference_batch_interference_list.append(self.endtime - self.starttime)
+            self.difference_batch_interference_list.append(
+                self.end_batch_interference_list[-1] - self.start_batch_interference_list[-1])
 
         def on_epoch_begin(self, epoch, logs={}):
             self.starttime = time.time()
@@ -85,7 +86,7 @@ def main():
             self.final_evaluation_accuracy += logs["categorical_accuracy"]
             self.endtime = time.time()
             self.end_list.append(self.endtime)
-            self.difference_list.append(self.endtime - self.starttime)
+            self.difference_list.append(self.end_list[-1] - self.start_list[-1])
 
     cb = TimingCallback()
 
@@ -95,19 +96,19 @@ def main():
     total_training_time = cb.end_train_time - cb.start_train_time
     average_epoch_training_time = np.mean(cb.difference_list)
     average_batch_interference_time = np.mean(cb.difference_batch_interference_list) * 1000
-    final_eval_accuracy = history["val_categorical_accuracy"][-1]
-    final_training_loss = history["loss"][-1]
+    final_eval_accuracy = history.history["val_categorical_accuracy"][-1]
+    final_training_loss = history.history["loss"][-1]
 
     metrics = {
         "model_name": "MLP",
         "framework_name": "TensorFlow",
         "dataset": "MNIST Digits",
         "task": "classification",
-        "Total Training Time": total_training_time,  # in seconds
-        "Final Training Loss": final_training_loss,
-        "Final Evaluation Accuracy": final_eval_accuracy,
-        "Average Epoch Training Time": average_epoch_training_time,  # in seconds
-        "Average Batch Inference Time": average_batch_interference_time  # in milliseconds
+        "total_training_time": total_training_time,  # in seconds
+        "final_training_loss": final_training_loss,
+        "final_evaluation_accuracy": final_eval_accuracy,
+        "average_epoch_training_time": average_epoch_training_time,  # in seconds
+        "average_batch_inference_time": average_batch_interference_time  # in milliseconds
     }
 
     for key, value in metrics.items():
