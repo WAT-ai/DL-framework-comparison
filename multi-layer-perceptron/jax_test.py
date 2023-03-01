@@ -39,10 +39,20 @@ import optax
 import numpy as np
 import jax.numpy as jnp
 import tensorflow_datasets as tfds
+import jax
 from tqdm import tqdm
-from jax import grad, jit, vmap
+from jax import grad, vmap
 from jax import random
 from jax.scipy.special import logsumexp
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
+args = parser.parse_args()
+RNG = random.PRNGKey(args.seed)
+
+# Force Jax to only use CPU
+jax.config.update("jax_platform_name", "cpu")
 
 # Suppress warning, info and error messages from jax, tf
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -51,7 +61,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 DATA_DIR = './data'
 
 class MLPModel:
-
     def __init__(self, layer_sizes, num_epochs=1, batch_size=128, n_targets=10, learning_rate=0.01):
 
         # Array of each layer size
@@ -78,7 +87,7 @@ class MLPModel:
         
         return scale * random.normal(w_key, (n, m)), scale * random.normal(b_key, (n,))
 
-    def __init_layers(self, key=random.PRNGKey(0) ):
+    def __init_layers(self, key=RNG):
         """
         Initialize all layers for a fully-connected neural network.
         """
@@ -354,7 +363,9 @@ def main():
 
     # Export to JSON
     print(f"\nTraining Metrics: \n{metrics}")
-    with open(f"m1-jax-mlp.json", "w") as outfile:
+    
+    date_str = time.strftime("%Y-%m-%d-%H%M%S")
+    with open(f"./output/m1-jax-mlp-{date_str}.json", "w") as outfile:
         json.dump(metrics, outfile)
 
     # Additional metrics - not included

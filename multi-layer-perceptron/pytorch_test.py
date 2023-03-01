@@ -6,9 +6,17 @@ import torchvision
 import torchvision.transforms as transforms
 import time
 import json
+import argparse
 from sklearn.metrics import accuracy_score
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
+args = parser.parse_args()
+
+torch.manual_seed(args.seed)
+
+device = "cpu"  # For MLP, no need to train on GPU
 
 def get_dataloaders():
     transform = transforms.Compose([
@@ -132,8 +140,8 @@ def main():
         "final_training_loss": train_metrics["epoch_train_loss"],
         "final_evaluation_accuracy": eval_metrics["eval_accuracy"],
     }
-
-    with open("m1-pytorch-mlp.json", "w") as outfile:
+    date_str = time.strftime("%Y-%m-%d-%H%M%S")
+    with open(f"./output/m1-pytorch-mlp-{date_str}.json", "w") as outfile:
         json.dump(metrics, outfile)
 
 if __name__ == "__main__":

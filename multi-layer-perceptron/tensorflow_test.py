@@ -3,7 +3,15 @@ import tensorflow_datasets as tfds
 import time
 import json
 import numpy as np
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
+args = parser.parse_args()
+tf.random.set_seed(args.seed)
+
+# Disable tensorflow GPU for MLP
+tf.config.set_visible_devices([], "GPU")
 
 def main():
     (ds_train, ds_test), ds_info = tfds.load(
@@ -12,6 +20,7 @@ def main():
         shuffle_files=True,
         as_supervised=True,
         with_info=True,
+        data_dir="./data"
     )
 
     def normalize_img(image, label):
@@ -114,9 +123,10 @@ def main():
     for key, value in metrics.items():
         print(f'{key} : {value}')
 
-    with open("m1-tensorflow-mlp.json", "w") as outfile:
+    date_str = time.strftime("%Y-%m-%d-%H%M%S")
+    with open(f"./output/m1-tensorflow-mlp-{date_str}.json", "w") as outfile:
         json.dump(metrics, outfile)
 
 
 if __name__ == "__main__":
-  main()
+    main()
