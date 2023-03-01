@@ -155,7 +155,8 @@ docs/site/
 # environment.
 Manifest.toml
 
-# Do not track output .json files
+# JSON result files
 m*.json
-# Data files
+
+# Data folder
 data
