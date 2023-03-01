@@ -6,10 +6,26 @@ using Printf
 using Knet: Param
 using Knet: accuracy, progress, nll, relu
 using Flux.Data: DataLoader
+using Random
+using ArgParse
+using Dates
+
+
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--seed", "-s"
+        help = "Random seed"
+        arg_type = Int
+        default = 42
+end
+
+args = parse_args(s)
+Random.seed!(args["seed"])
+
 
 # This loads the MNIST handwritten digit recognition dataset. This code is based off the Knet Tutorial Notebook. 
-xtrn, ytrn = MNIST(split=:train)[:]
-xtst, ytst = MNIST(split=:test)[:]
+xtrn, ytrn = MNIST(split=:train, dir="./data/MNIST/raw")[:]
+xtst, ytst = MNIST(split=:test, dir="./data/MNIST/raw")[:]
 
 
 xtrn = reshape(xtrn, 784, 60000) 
@@ -84,6 +100,7 @@ metrics = Dict(
 
 stringdata = JSON.json(metrics)
 
-open("m1-Knet-mlp.json", "w") do f
+date_str = Dates.format(Dates.now(), "yyyy-mm-dd-HHMMSS")
+open("./output/m1-knet-mlp-$(date_str).json", "w") do f
     write(f, stringdata)
 end 

@@ -5,6 +5,17 @@ using Flux: onehotbatch, onecold, logitcrossentropy
 using MLDatasets
 using JSON
 using TimerOutputs
+using Random
+using ArgParse
+using Dates
+
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--seed", "-s"
+        help = "Random seed"
+        arg_type = Int
+        default = 42
+end
 
 function accuracy(data_loader, model)
     acc = 0
@@ -15,11 +26,14 @@ function accuracy(data_loader, model)
 end
     
 function main()
+    args = parse_args(s)
+    Random.seed!(args["seed"])
+
     time_outputs = TimerOutput()
     json_result = Dict()
     
-    xtrain, ytrain = MLDatasets.MNIST(split=:train)[:]
-    xtest, ytest = MLDatasets.MNIST(split=:test)[:]
+    xtrain, ytrain = MLDatasets.MNIST(split=:train, dir="./data/MNIST/raw")[:]
+    xtest, ytest = MLDatasets.MNIST(split=:test, dir="./data/MNIST/raw")[:]
     
     # Reshape Data in order to flatten each image into a linear array
     xtrain = Flux.flatten(xtrain)
@@ -69,7 +83,8 @@ function main()
     json_result["final_training_loss"] = loss_func(xtest, ytest)
     json_result["final_evaluation_accuracy"] = accuracy(test_data, model)
     
-    open("m1-flux-mlp.json","w") do f
+    date_str = Dates.format(Dates.now(), "yyyy-mm-dd-HHMMSS")
+    open("./output/m1-flux-mlp-$(date_str).json", "w") do f
         JSON.print(f, json_result)
     end
 end

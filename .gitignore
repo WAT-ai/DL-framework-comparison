@@ -158,5 +158,6 @@ Manifest.toml
 # JSON result files
 m*.json
 
-# Data folder
+# Data folder and output folder
 data
+output
