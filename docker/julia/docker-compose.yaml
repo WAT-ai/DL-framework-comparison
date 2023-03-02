@@ -1,0 +1,22 @@
+services:
+  python:
+    image: wat-ai/julia:latest
+    container_name: wat-ai-julia
+    user: root
+    tty: true
+    # deploy:
+    #     resources:
+    #       reservations:
+    #         devices:
+    #           - driver: nvidia
+    #             count: all
+    #             capabilities: [gpu]
+    volumes:
+      # External drive
+      - /media/ob1/drive1:/root
+      # VS Code extensions
+      - /media/ob1/drive1/trevor/.vscode-extension-test:/home/vscode/.vscode-server/extensions
+      # Forward SSH client
+      - $SSH_AUTH_SOCK:$SSH_AUTH_SOCK
+    environment:
+      - SSH_AUTH_SOCK=$SSH_AUTH_SOCK   
