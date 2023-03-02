@@ -1,13 +1,16 @@
 import tensorflow as tf
 from tensorflow.keras.layers import Conv2D, BatchNormalization, GlobalAveragePooling2D, Dense
 import tensorflow_datasets as tfds
-from timeit import default_timer
 import time
 import json
 import numpy as np
+import argparse
 
-# Hyperparameters
-BATCH_SIZE = 32
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
+args = parser.parse_args()
+tf.random.set_seed(args.seed)
+
 
 # ResNet Layers
 class IdentityResidual(tf.keras.layers.Layer):
@@ -92,7 +95,8 @@ class TimingCallback(tf.keras.callbacks.Callback):
     def on_test_batch_end(self, batch, logs={}):
         self.endtime = time.time()
         self.end_batch_interference_list.append(self.endtime)
-        self.difference_batch_interference_list.append(self.endtime - self.starttime)
+        self.difference_batch_interference_list.append(
+            self.end_batch_interference_list[-1] - self.start_batch_interference_list[-1])
 
     def on_epoch_begin(self, epoch, logs={}):
         self.starttime = time.time()
@@ -100,13 +104,13 @@ class TimingCallback(tf.keras.callbacks.Callback):
 
     def on_epoch_end(self, epoch, logs={}):
         self.final_training_loss += logs["loss"]
-        self.final_evaluation_accuracy += logs["categorical_accuracy"]
+        self.final_evaluation_accuracy += logs["sparse_categorical_accuracy"]
         self.endtime = time.time()
         self.end_list.append(self.endtime)
-        self.difference_list.append(self.endtime - self.starttime)
+        self.difference_list.append(self.end_list[-1] - self.start_list[-1])
 
 
-def get_datasets():
+def get_datasets(batch_size):
     """
     Creates train, validation, and test datasets.
     Applies data normalization to all datasets and augmentation to training only.
@@ -114,7 +118,8 @@ def get_datasets():
     train_ds, val_ds, test_ds = tfds.load(
         "cifar10", 
         split=["train[:90%]", "train[90%:]", "test"],
-        as_supervised=True
+        as_supervised=True,
+        shuffle_files=True,
     )
     
     mean = [0.485, 0.456, 0.406]
@@ -139,18 +144,18 @@ def get_datasets():
 
     AUTOTUNE = tf.data.AUTOTUNE
 
-    train_ds = train_ds.map(lambda x, y: (augment_pipeline(x, training=True), y))
-    train_ds = train_ds.cache().shuffle(1000).batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
+    train_ds = train_ds.cache().shuffle(1000).batch(batch_size, drop_remainder=True)
+    train_ds = train_ds.map(lambda x, y: (augment_pipeline(x, training=True), y)).prefetch(AUTOTUNE)
 
-    val_ds = val_ds.map(lambda x, y: (evaluate_pipeline(x, training=False), y))
-    val_ds = val_ds.cache().batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
-    
-    test_ds = test_ds.map(lambda x, y: (evaluate_pipeline(x, training=False), y))
-    test_ds = test_ds.cache().batch(BATCH_SIZE, drop_remainder=True).prefetch(AUTOTUNE)
+    val_ds = val_ds.cache().shuffle(1000).batch(batch_size, drop_remainder=True)
+    val_ds = val_ds.map(lambda x, y: (evaluate_pipeline(x, training=False), y)).prefetch(AUTOTUNE)
+
+    test_ds = test_ds.cache().shuffle(1000).batch(batch_size, drop_remainder=True)
+    test_ds = test_ds.map(lambda x, y: (evaluate_pipeline(x, training=False), y)).prefetch(AUTOTUNE)
     
     return train_ds, val_ds, test_ds
 
-def get_compiled_model():
+def get_compiled_model(batch_size):
     ResNetV2Model = tf.keras.Sequential([
         Conv2D(filters=16, kernel_size=3, padding="same", use_bias=False, data_format="channels_last"),
         ResNetV2Layer(16),
@@ -167,12 +172,11 @@ def get_compiled_model():
     ])
 
     # Model needs dummy input to build
-    inputs = tf.random.normal((32, 32, 32, 3))
+    inputs = tf.random.normal((batch_size, 32, 32, 3))
     z = ResNetV2Model(inputs)
     
     ResNetV2Model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3, weight_decay=1e-4),
-        # optimizer=optimizer,
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=[
             tf.keras.metrics.SparseCategoricalAccuracy(),
@@ -183,9 +187,10 @@ def get_compiled_model():
 
 
 def main():
-    train_ds, val_ds, test_ds = get_datsets()
+    BATCH_SIZE = 128
+    train_ds, val_ds, test_ds = get_datasets(BATCH_SIZE)
 
-    model = get_compiled_model()
+    model = get_compiled_model(BATCH_SIZE)
 
     cb = TimingCallback()
 
@@ -198,8 +203,8 @@ def main():
     total_training_time = cb.end_train_time - cb.start_train_time
     average_epoch_training_time = np.mean(cb.difference_list)
     average_batch_interference_time = np.mean(cb.difference_batch_interference_list) * 1000
-    final_eval_accuracy = history["val_sparse_categorical_accuracy"][-1]
-    final_train_loss = history["loss"][-1]
+    final_eval_accuracy = history.history["val_sparse_categorical_accuracy"][-1]
+    final_train_loss = history.history["loss"][-1]
 
     metrics = {
         "model_name": "ResNetV2-20",
@@ -207,8 +212,8 @@ def main():
         "dataset": "MNIST Digits",
         "task": "classification",
         "final_training_loss": final_train_loss,
-        "final_evaluation_accuracy": final_accuracy,
-        "final_test_accuracy": test_metrics["sparse_categorical_accuracy"],
+        "final_evaluation_accuracy": final_eval_accuracy,
+        "final_test_accuracy": test_metrics[1],  # Metrics is list of [loss, acc, ce]
         "total_training_time": total_training_time,  # in seconds
         "average_epoch_training_time": average_epoch_training_time,  # in seconds
         "average_batch_interference_time": average_batch_interference_time  # in milliseconds
@@ -217,7 +222,8 @@ def main():
     for key, value in metrics.items():
         print(f'{key} : {value}')
 
-    with open("output.json", "w") as outfile:
+    date_str = time.strftime("%Y-%m-%d-%H%M%S")
+    with open(f"./output/m2-tensorflow-cnn-{date_str}.json", "w") as outfile:
         json.dump(metrics, outfile)
 
 
