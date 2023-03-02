@@ -80,7 +80,7 @@ function main()
     json_result["average_epoch_training_time"] = TimerOutputs.time(time_outputs["train_time"]["train_epoch"]) / (9 * 1e9)
     num_batches = length(test_data)
     json_result["average_batch_inference_time"] = TimerOutputs.time(time_outputs["train_time"]["eval_epoch"]) / (9 * 1e6 * num_batches)
-    json_result["final_training_loss"] = loss_func(xtest, ytest)
+    json_result["final_training_loss"] = loss_func(xtrain, ytrain)
     json_result["final_evaluation_accuracy"] = accuracy(test_data, model)
     
     date_str = Dates.format(Dates.now(), "yyyy-mm-dd-HHMMSS")
