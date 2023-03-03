@@ -46,6 +46,7 @@ import json
 
 # importing the mnist dataset
 from keras.datasets import mnist
+
 import argparse
 
 parser = argparse.ArgumentParser()
