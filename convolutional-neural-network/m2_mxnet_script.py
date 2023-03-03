@@ -15,6 +15,20 @@ import torch.utils # needed to split the training DS into train_data and cv_data
 import json
 import time
 
+# Other imports
+import argparse
+import os
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
+args = parser.parse_args()
+mx.random.seed(args.seed)
+
+# Supress warnings
+os.environ["MXNET_CUDNN_LIB_CHECKING"] = "0"
+
+# GPU context
+ctx = mx.gpu(0)
 
 ## Class definitions
 # Defining the ResNetV2 Class Structure
@@ -45,7 +59,7 @@ class BasicBlock(nn.Block):
         #creating padding tenspr for extra channels
         (b, c, h, w) = x.shape
         num_pad_channels = self.channels - self.in_channels
-        pad = mx.nd.zeros((b, num_pad_channels, h,w))
+        pad = mx.nd.zeros((b, num_pad_channels, h,w), ctx=ctx)
         # append this padding to the downsampled identity
         x = mx.nd.concat(x , pad, dim = 1)
         return x
@@ -145,7 +159,7 @@ def data_split_and_load(train_ds, test_ds, batch_size=128, train_cv_split_ratio=
     cv_data = gluon.data.DataLoader(cv_ds, batch_size=batch_size,  shuffle=True, last_batch='discard')
     test_data = gluon.data.DataLoader(test_ds, batch_size=batch_size,  shuffle=True, last_batch='discard')
     
-    return train_data, cv_data, test_data, batch_size, train_size, cv_size
+    return train_data, cv_data, test_data
 
 def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
     """Initialize the network and load it into the trainer
@@ -164,10 +178,12 @@ def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
     """
     # net = ResNetV2()
     net.initialize()
+    params = net.collect_params()
+    params.reset_ctx(ctx)  # Put on GPU
     trainer = gluon.Trainer(
-        params = net.collect_params(),
+        params=params,
         optimizer= optimizer,
-        optimizer_params = {'learning_rate': lr, 'beta1': beta_1, 'beta2': beta_2, 'wd':wd}
+        optimizer_params={'learning_rate': lr, 'beta1': beta_1, 'beta2': beta_2, 'wd':wd}
     ) # The guidelines state using AdamW optimizer, unsure whether 'adam' is sufficient
     return trainer, net
 
@@ -188,12 +204,11 @@ def train(net, trainer, train_data, cv_data, batch_size, epochs=10):
         tic_train_epoch = time.time()
         # creating cumulative loss variable
         cum_loss = 0
-        # Resetting train_data iterator
-        train_data.reset()
         
         # Looping over train_data iterator
         for data, label in train_data:
-            
+            data = data.as_in_context(ctx)
+            label = label.as_in_context(ctx)
             # Inside training scope
             with ag.record():
                 # Inputting the data into the nn
@@ -203,12 +218,12 @@ def train(net, trainer, train_data, cv_data, batch_size, epochs=10):
 
             # Backpropogating the error
             loss.backward()
+            trainer.step(batch_size)
         
             # Summation of loss (divided by sample_size in the end)
-            cum_loss += nd.sum(loss).asscalar()
+            cum_loss += loss.mean().asscalar()
             metric.update(label, outputs)
 
-            trainer.step(batch_size)
         
         # Get evaluation results    
         name, acc = metric.get()  
@@ -220,6 +235,8 @@ def train(net, trainer, train_data, cv_data, batch_size, epochs=10):
         # Looping over cv_data iterator
         tic_val = time.time() # initializing cv timer
         for data, label in cv_data:
+            data = data.as_in_context(ctx)
+            label = label.as_in_context(ctx)
             val_outputs = net(data)
             
             metric.update(label, val_outputs)
@@ -256,6 +273,8 @@ def test(net, test_data):
 
     # Looping over cv_data iterator
     for data, label in test_data:
+        data = data.as_in_context(ctx)
+        label = label.as_in_context(ctx)
         test_outputs = net(data)
         
         metric.update(label, test_outputs)
@@ -269,6 +288,10 @@ def test(net, test_data):
 
 
 def main():
+    # Hyperparameters
+    BATCH_SIZE = 128
+    LR = 1e-3
+
     transform_train = transforms.Compose([
         gcv_transforms.RandomCrop(32, pad=4), # Randomly crop an area and resize it to be 32x32, then pad it to be 40x40
         transforms.RandomFlipLeftRight(), # Applying a random horizontal flip
@@ -287,16 +310,16 @@ def main():
     full_train_ds , test_ds = import_and_transform_data(transform_train, transform_test) 
     
     # Splitting data and Loading into DataLoader
-    train_data, cv_data, test_data, batch_size , train_size, cv_size = data_split_and_load(full_train_ds, test_ds) 
+    train_data, cv_data, test_data = data_split_and_load(full_train_ds, test_ds, batch_size=BATCH_SIZE) 
 
     # initializing network and loading into the trainer
-    trainer, net = net_intialize(ResNetV2(), 'adam', 0.001, 0.9, 0.999, 0.0001)
+    trainer, net = net_intialize(ResNetV2(), 'adam', LR, 0.9, 0.999, 0.0001)
 
     ## Training the Model
-    metrics = train(net, batch_size , num_examples=train_size)
+    metrics = train(net, trainer, train_data, cv_data, BATCH_SIZE, epochs=10)
 
     ## Runnning Model on Hold-out Dataset
-    test_metrics = test()
+    test_metrics = test(net, test_data)
     metrics.update(test_metrics)
 
     print("Metrics: ")
