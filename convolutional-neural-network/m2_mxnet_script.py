@@ -11,13 +11,10 @@ from mxnet.gluon.data.vision import transforms, CIFAR10
 from gluoncv.data import transforms as gcv_transforms
 import torch.utils # needed to split the training DS into train_data and cv_data
 
-
 # json library neded to export metrics 
 import json
 import time
 
-# Miscellaneous libraries incase I need them for testing
-import math
 
 ## Class definitions
 # Defining the ResNetV2 Class Structure
@@ -119,12 +116,12 @@ def import_and_transform_data(transform_train, transform_test):
         test_ds: 10,000 transformed image dataset used for testing models.
     """
     # Creating the train and test DS
-    full_train_ds = CIFAR10(train=True).transform_first(transform_train, lazy=False)
-    test_ds = CIFAR10(train=False).transform_first(transform_test, lazy=False)
+    full_train_ds = CIFAR10(train=True).transform_first(transform_train)
+    test_ds = CIFAR10(train=False).transform_first(transform_test)
     return full_train_ds, test_ds
 
 
-def data_split_and_load(train_ds, test_ds, batch_size = 256, train_cv_split_ratio = 0.9):
+def data_split_and_load(train_ds, test_ds, batch_size=128, train_cv_split_ratio=0.9):
     """Imports, pre-processes, and loads a dataset into a DataLoader
 
     Args:
@@ -174,7 +171,7 @@ def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
     ) # The guidelines state using AdamW optimizer, unsure whether 'adam' is sufficient
     return trainer, net
 
-def train(net, batch_size, num_examples, epochs = 50):
+def train(net, trainer, train_data, cv_data, batch_size, epochs=10):
     # Initializing time related variables and lists (to make it easier for metric outputs)
 
     # initializing the training times
@@ -192,7 +189,7 @@ def train(net, batch_size, num_examples, epochs = 50):
         # creating cumulative loss variable
         cum_loss = 0
         # Resetting train_data iterator
-
+        train_data.reset()
         
         # Looping over train_data iterator
         for data, label in train_data:
@@ -201,10 +198,7 @@ def train(net, batch_size, num_examples, epochs = 50):
             with ag.record():
                 # Inputting the data into the nn
                 outputs = net(data)
-                
-                # outputs =outputs.argmax(axis=1)
-                # label = label.astype('float32').mean().asscalar()
-                # # Computing the loss
+                # Computing the loss
                 loss = softmax_ce(outputs,label)
 
             # Backpropogating the error
@@ -212,7 +206,7 @@ def train(net, batch_size, num_examples, epochs = 50):
         
             # Summation of loss (divided by sample_size in the end)
             cum_loss += nd.sum(loss).asscalar()
-            metric.update(label,outputs)
+            metric.update(label, outputs)
 
             trainer.step(batch_size)
         
@@ -238,14 +232,26 @@ def train(net, batch_size, num_examples, epochs = 50):
         toc_val = time.time() 
         
         print("Epoch %s | Loss: %.6f, Train_acc: %.6f, Val_acc: %.6f, in %.2fs " %
-        (epoch+1, cum_loss/num_examples, acc, val_acc, epoch_times[epoch]))
+        (epoch+1, cum_loss/len(train_data), acc, val_acc, epoch_times[epoch]))
     toc_total_train = time.time() # total training time
     print("Total_training_time:  %.2fs" %(toc_total_train - tic_total_train))
     print("-"*70)
-    
-    return acc, val_acc, tic_val, toc_val, tic_total_train, toc_total_train, epoch_times, cum_loss
 
-def test():
+    metrics = {
+        'model_name': 'ResNetV2-20',
+        'framework_name': 'MxNet',
+        'dataset': 'CIFAR-10',
+        'task': 'classification',
+        'total_training_time': toc_total_train - tic_total_train, # s
+        'average_epoch_training_time': np.average(epoch_times), # s
+        'average_batch_inference_time': 1000 * (toc_val - tic_val) / len(cv_data), # ms
+        'final_training_loss': cum_loss/len(train_data), 
+        'final_evaluation_accuracy': val_acc, 
+    }
+    
+    return metrics
+
+def test(net, test_data):
     metric = mx.metric.Accuracy()
 
     # Looping over cv_data iterator
@@ -258,37 +264,9 @@ def test():
     name, test_acc = metric.get()
     print('Test_acc: ', test_acc)
     print("-"*70)
-    return test_acc
-
-def get_metrics(tic_total_train, toc_total_train, tic_val, toc_val, epoch_times, batch_size, train_size, cv_size, cum_loss, val_acc, test_acc):
-    metrics = {
-        'model_name': 'ResNetV2-20',
-        'framework_name': 'MxNet',
-        'dataset': 'CIFAR-10',
-        'task': 'classification',
-        'total_training_time': toc_total_train - tic_total_train, # s
-        'average_epoch_training_time': np.average(epoch_times), # s
-        'average_batch_inference_time': 1000*np.average(toc_val - tic_val)/math.ceil(cv_size/batch_size), # ms
-        'final_training_loss': cum_loss/train_size, 
-        'final_evaluation_accuracy': val_acc, 
-        'final_test_accuracy': test_acc 
-    }
-
-    print("Metrics: ")
-    print(metrics)
-    # Exporting the metrics file
-    with open('m2-mxnet-cnn.json', 'w') as outfile:
-        json.dump(metrics, outfile)
+    metrics = {"final_test_accuracy": test_acc}
     return metrics
- 
- 
 
-    
-## Data Import and pre-processing
-# defining the transformation functions for the image data
-
-# As mentioned in the notebook transform_train will be used on both train_data and cv_data, while transform_test will be used on test_data. Since training
-# dataset provides more randomized data (and should be more generalizable), I will not be performing the random operations on the testing dataset.
 
 def main():
     transform_train = transforms.Compose([
@@ -306,7 +284,7 @@ def main():
     ])
     
     # Importing and transforming data     
-    full_train_ds , test_ds =  import_and_transform_data(transform_train, transform_test) 
+    full_train_ds , test_ds = import_and_transform_data(transform_train, transform_test) 
     
     # Splitting data and Loading into DataLoader
     train_data, cv_data, test_data, batch_size , train_size, cv_size = data_split_and_load(full_train_ds, test_ds) 
@@ -315,14 +293,19 @@ def main():
     trainer, net = net_intialize(ResNetV2(), 'adam', 0.001, 0.9, 0.999, 0.0001)
 
     ## Training the Model
-    training_results = [] # storing all the variables returned from the train fn.
-    training_results = train(net, batch_size , num_examples=train_size)
+    metrics = train(net, batch_size , num_examples=train_size)
 
     ## Runnning Model on Hold-out Dataset
-    test_acc = test()
+    test_metrics = test()
+    metrics.update(test_metrics)
 
-    ## Metrics Acquisition
-    get_metrics(training_results[4], training_results[5], training_results[2], training_results[3], training_results[6], batch_size, train_size, cv_size, training_results[7], training_results[1], test_acc)
+    print("Metrics: ")
+    print(metrics)
+    
+    # Exporting the metrics file
+    date_str = time.strftime("%Y-%m-%d-%H%M%S")
+    with open(f'./output/m2-mxnet-cnn-{date_str}.json', 'w') as outfile:
+        json.dump(metrics, outfile)
 
 
 if __name__ == "__main__":
