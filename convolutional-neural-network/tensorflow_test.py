@@ -176,7 +176,7 @@ def get_compiled_model(batch_size):
     z = ResNetV2Model(inputs)
     
     ResNetV2Model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3, weight_decay=1e-4),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=[
             tf.keras.metrics.SparseCategoricalAccuracy(),

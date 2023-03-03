@@ -221,7 +221,7 @@ def eval_epoch(model, criterion, val_loader, epoch):
 def main():
     model = ResNetV2().to(device)
     loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     train_loader, val_loader, test_loader = get_datasets(batch_size=128)
 
     start_train = time.time()

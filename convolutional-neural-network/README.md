@@ -52,11 +52,10 @@ Using ResNetV2
 - Preprocessing labels: Use integer indices
 
 ### Hyperparameters:
-- Optimizer: AdamW
+- Optimizer: Adam
 - learning rate: 1e-3 
 - beta_1: 0.9
 - beta_2: 0.999
-- weight decay: 0.0001
 - Number of epochs for training: 10
 - Batch size: 128
 

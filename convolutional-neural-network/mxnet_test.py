@@ -161,7 +161,7 @@ def data_split_and_load(train_ds, test_ds, batch_size=128, train_cv_split_ratio=
     
     return train_data, cv_data, test_data
 
-def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
+def net_intialize(net, optimizer, lr, beta_1, beta_2):
     """Initialize the network and load it into the trainer
 
     Args:
@@ -170,7 +170,6 @@ def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
         lr (float): learning rate of model
         beta_1 (float): beta_1 value
         beta_2 (float): beta_2 value
-        wd (float): weight decay to be used
         
     Outputs:
         trainer: Trainer class for forward and backward propogation during runs
@@ -183,8 +182,8 @@ def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
     trainer = gluon.Trainer(
         params=params,
         optimizer= optimizer,
-        optimizer_params={'learning_rate': lr, 'beta1': beta_1, 'beta2': beta_2, 'wd':wd}
-    ) # The guidelines state using AdamW optimizer, unsure whether 'adam' is sufficient
+        optimizer_params={'learning_rate': lr, 'beta1': beta_1, 'beta2': beta_2}
+    )
     return trainer, net
 
 def train(net, trainer, train_data, cv_data, batch_size, epochs=10):
@@ -313,7 +312,7 @@ def main():
     train_data, cv_data, test_data = data_split_and_load(full_train_ds, test_ds, batch_size=BATCH_SIZE) 
 
     # initializing network and loading into the trainer
-    trainer, net = net_intialize(ResNetV2(), 'adam', LR, 0.9, 0.999, 0.0001)
+    trainer, net = net_intialize(ResNetV2(), 'adam', LR, 0.9, 0.999)
 
     ## Training the Model
     metrics = train(net, trainer, train_data, cv_data, BATCH_SIZE, epochs=10)

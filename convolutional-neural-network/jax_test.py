@@ -148,13 +148,13 @@ class TrainState(train_state.TrainState):
     batch_stats: Any
 
 
-def create_train_state(rng, learning_rate, batch_size, weight_decay=1e-4):
+def create_train_state(rng, learning_rate, batch_size):
     """Creates initial `TrainState`."""
     model = ResNetV2Model()
     variables = model.init(rng, jnp.ones([batch_size, 32, 32, 3]))
     params = variables["params"]
     batch_stats = variables["batch_stats"]
-    tx = optax.adamw(learning_rate, weight_decay=weight_decay)
+    tx = optax.adam(learning_rate)
     return TrainState.create(apply_fn=model.apply, params=params, batch_stats=batch_stats, tx=tx)
 
 @jax.jit
