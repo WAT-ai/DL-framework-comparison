@@ -1,1 +1,0 @@
-{"model_name": "ResNetV2-20", "framework_name": "MxNet", "dataset": "CIFAR-10", "task": "classification", "total_training_time": 104.92541170120239, "average_epoch_training_time": 2.0555028200149534, "average_batch_inference_time": 22.96757698059082, "final_training_loss": 0.035535628321893054, "final_evaluation_accuracy": 0.34375, "final_test_accuracy": 0.3425480769230769}
