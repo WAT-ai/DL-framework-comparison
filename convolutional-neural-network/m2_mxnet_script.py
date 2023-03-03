@@ -1,86 +1,13 @@
-'''
-Wati.ai Python/Julia framework benchmark comparison Project
-Milestone 2
-
-Model Specifications
-Model: Convolutional Neural Network (CNN)
-Using ResNetV2
-- Input layer: Input size: (32 x 32) x 3
-    - conv2d (3 x 3) x 64
-- ResBlock 1: Input size (32 x 32) x 64
-     - conv2d (3 x 3) x 16
-     - conv2d (3 x 3) x 16
-- ResBlock 2: Input size (32 x 32) x 16
-     - conv2d (3 x 3) x 16
-     - conv2d (3 x 3) x 16
-- ResBlock 3: Input size (32 x 32) x 16
-     - conv2d (3 x 3) x 16
-     - conv2d (3 x 3) x 16  
-- ResBlock 4: Input size (32 x 32) x 16
-     - conv2d (3 x 3) x 32, stride 2
-     - conv2d (3 x 3) x 32
-- ResBlock 5: Input size (16 x 16) x 32
-     - conv2d (3 x 3) x 32
-     - conv2d (3 x 3) x 32
-- ResBlock 6: Input size (16 x 16) x 32
-     - conv2d (3 x 3) x 32
-     - conv2d (3 x 3) x 32
-- ResBlock 7: Input size (16 x 16) x 32
-     - conv2d (3 x 3) x 64, stride 2
-     - conv2d (3 x 3) x 64
-- ResBlock 8: Input size (8 x 8) x 64
-     - conv2d (3 x 3) x 64
-     - conv2d (3 x 3) x 64
-- ResBlock 9: Input size (8 x 8) x 64
-     - conv2d (3 x 3) x 64
-     - conv2d (3 x 3) x 64
-- Pooling: input size (8 x 8) x 64
-     - GlobalAveragePooling/AdaptiveAveragePooling((1,1))
-- Output layer: Input size (64,)
-     - Dense/Linear (64,10)
-     - Activation: Softmax
-     
-Data: CIFAR-10
-- 32 x 32 x 3 RGB colour images
-- Train/Test split: Use data splits already given (50,000 train, 10,000 test). From the 50,000 train images, use 45,000 for training and 5,000 for validation every epoch inside the training loop. Reserve the 10,000 test set images for final evaluation.
-- Pre-processing inputs: 
-     - Depending on data source, scale int8 inputs to [0, 1] by dividing by 255
-     - ImageNet normalization 
-          - From the RGB channels, subtract means [0.485, 0.456, 0.406] and divide by standard deviations [0.229, 0.224, 0.225]
-     - 4 pixel padding on EACH side (40x40), then apply 32x32 crop randomly sampled from the padded image or its horizontal flip as in Section 3.2 of [3]
-- Preprocessing labels: Use integer indices
-
-Hyperparameters:
-- Optimizer: AdamW
-- learning rate: 1e-3 
-- beta_1: 0.9
-- beta_2: 0.999
-- weight decay: 0.0001
-- Number of epochs for training: 50 (TBD)
-- Batch size: 256 (TBD)
-
-
-Metrics to record:
-- Total training time (from start of training script to end of training run)
-- Training time per 1 epoch (measure from start to end of each epoch and average over all epochs)
-- Inference time per batch (measure per batch and average over all batches)
-- Last epoch training loss
-- Last epoch eval accuracy (from the 5,000 evaluation dataset)
-- Held-out test set accuracy (from the 10,000 test dataset)
-'''
-
 # importing necesary libraries
 # Mxnet and numpy imports
 import numpy as np
 
 import mxnet as mx
-from mxnet import gluon, nd, autograd as ag, npx
+from mxnet import gluon, nd, autograd as ag
 from mxnet.gluon import nn
-
 
 # Libraries for datasets and pre-preprocessing
 from mxnet.gluon.data.vision import transforms, CIFAR10
-import gluoncv
 from gluoncv.data import transforms as gcv_transforms
 import torch.utils # needed to split the training DS into train_data and cv_data
 
@@ -90,7 +17,6 @@ import json
 import time
 
 # Miscellaneous libraries incase I need them for testing
-import matplotlib as plt
 import math
 
 ## Class definitions
@@ -146,26 +72,25 @@ class ResNetV2(nn.Block):
     def __init__(self, **kwargs):
         super(ResNetV2, self).__init__(**kwargs)
 
-        self.input_layer = nn.Conv2D(in_channels = 3, channels= 16, kernel_size=(3,3), padding=1)
+        self.input_layer = nn.Conv2D(in_channels=3, channels=16, kernel_size=(3,3), padding=1, use_bias=False)
 
-        self.layer_1 = BasicBlock(16,16)
-        self.layer_2 = BasicBlock(16,16)
-        self.layer_3 = BasicBlock(16,16)
+        self.layer_1 = BasicBlock(16, 16)
+        self.layer_2 = BasicBlock(16, 16)
+        self.layer_3 = BasicBlock(16, 16)
 
-        self.layer_4 = BasicBlock(16,32, strides = 2)
-        self.layer_5 = BasicBlock(32,32)
-        self.layer_6 = BasicBlock(32,32)
+        self.layer_4 = BasicBlock(16, 32, strides=2)
+        self.layer_5 = BasicBlock(32, 32)
+        self.layer_6 = BasicBlock(32, 32)
 
-        self.layer_7 = BasicBlock(32,64, strides = 2)
-        self.layer_8 = BasicBlock(64,64)
-        self.layer_9 = BasicBlock(64,64)
+        self.layer_7 = BasicBlock(32, 64, strides=2)
+        self.layer_8 = BasicBlock(64, 64)
+        self.layer_9 = BasicBlock(64, 64)
 
         self.flatten = nn.Flatten()
 
-        self.pool = nn.GlobalAvgPool2D(layout = 'NCHW')
+        self.pool = nn.GlobalAvgPool2D(layout='NCHW')
         self.output_layer = nn.Dense(units=10, in_units=64)
 
-    
     def forward (self, x):
         out = self.input_layer(x)
         out = self.layer_1(out)
@@ -177,11 +102,8 @@ class ResNetV2(nn.Block):
         out = self.layer_7(out)
         out = self.layer_8(out)
         out = self.layer_9(out)
-        # print("Before Pool: ", out.shape)
         out = self.pool(out)
-        # print("After Pool: ", out.shape)
         out = self.flatten(out)
-        # print("After Flattening: ", out.shape)
         out = self.output_layer(out)
         return out
 
@@ -198,7 +120,7 @@ def import_and_transform_data(transform_train, transform_test):
     """
     # Creating the train and test DS
     full_train_ds = CIFAR10(train=True).transform_first(transform_train, lazy=False)
-    test_ds = CIFAR10(train= False).transform_first(transform_test, lazy=False)
+    test_ds = CIFAR10(train=False).transform_first(transform_test, lazy=False)
     return full_train_ds, test_ds
 
 
@@ -245,10 +167,11 @@ def net_intialize(net, optimizer, lr, beta_1, beta_2, wd):
     """
     # net = ResNetV2()
     net.initialize()
-    trainer = gluon.Trainer(params = net.collect_params(),
-                    optimizer= optimizer,
-                    optimizer_params = {'learning_rate': lr, 'beta1': beta_1, 'beta2': beta_2, 'wd':wd}
-                    ) # The guidelines state using AdamW optimizer, unsure whether 'adam' is sufficient
+    trainer = gluon.Trainer(
+        params = net.collect_params(),
+        optimizer= optimizer,
+        optimizer_params = {'learning_rate': lr, 'beta1': beta_1, 'beta2': beta_2, 'wd':wd}
+    ) # The guidelines state using AdamW optimizer, unsure whether 'adam' is sufficient
     return trainer, net
 
 def train(net, batch_size, num_examples, epochs = 50):
@@ -339,17 +262,16 @@ def test():
 
 def get_metrics(tic_total_train, toc_total_train, tic_val, toc_val, epoch_times, batch_size, train_size, cv_size, cum_loss, val_acc, test_acc):
     metrics = {
-
-    'model_name': 'ResNetV2-20',
-    'framework_name': 'MxNet',
-    'dataset': 'CIFAR-10',
-    'task': 'classification',
-    'total_training_time': toc_total_train - tic_total_train, #s
-    'average_epoch_training_time': np.average(epoch_times), #s
-    'average_batch_inference_time': 1000*np.average(toc_val - tic_val)/math.ceil(cv_size/batch_size), #ms
-    'final_training_loss': cum_loss/train_size, 
-    'final_evaluation_accuracy': val_acc, 
-    'final_test_accuracy': test_acc 
+        'model_name': 'ResNetV2-20',
+        'framework_name': 'MxNet',
+        'dataset': 'CIFAR-10',
+        'task': 'classification',
+        'total_training_time': toc_total_train - tic_total_train, # s
+        'average_epoch_training_time': np.average(epoch_times), # s
+        'average_batch_inference_time': 1000*np.average(toc_val - tic_val)/math.ceil(cv_size/batch_size), # ms
+        'final_training_loss': cum_loss/train_size, 
+        'final_evaluation_accuracy': val_acc, 
+        'final_test_accuracy': test_acc 
     }
 
     print("Metrics: ")
@@ -368,45 +290,40 @@ def get_metrics(tic_total_train, toc_total_train, tic_val, toc_val, epoch_times,
 # As mentioned in the notebook transform_train will be used on both train_data and cv_data, while transform_test will be used on test_data. Since training
 # dataset provides more randomized data (and should be more generalizable), I will not be performing the random operations on the testing dataset.
 
-transform_train = transforms.Compose([ gcv_transforms.RandomCrop(32, pad=4), # Randomly crop an area and resize it to be 32x32, then pad it to be 40x40
-                                    transforms.RandomFlipLeftRight(), # Applying a random horizontal flip
-                                    transforms.ToTensor(), # Transpose the image from height*width*num_channels to num_channels*height*width
+def main():
+    transform_train = transforms.Compose([
+        gcv_transforms.RandomCrop(32, pad=4), # Randomly crop an area and resize it to be 32x32, then pad it to be 40x40
+        transforms.RandomFlipLeftRight(), # Applying a random horizontal flip
+        transforms.ToTensor(), # Transpose the image from height*width*num_channels to num_channels*height*width
                                                            # and map values from [0, 255] to [0,1]
-                                    # Normalize the image with mean and standard deviation calculated across all images
-                                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
-                                ])
+        # Normalize the image with mean and standard deviation calculated across all images
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+    ])
 
-transform_test = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
-                                ])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) 
+    ])
     
-# Importing and transforming data     
-full_train_ds , test_ds =  import_and_transform_data(transform_train, transform_test) 
-poc_train_ds = full_train_ds[0:1024] # Use this as the train ds if showcasing proof of concepts.
+    # Importing and transforming data     
+    full_train_ds , test_ds =  import_and_transform_data(transform_train, transform_test) 
+    
+    # Splitting data and Loading into DataLoader
+    train_data, cv_data, test_data, batch_size , train_size, cv_size = data_split_and_load(full_train_ds, test_ds) 
 
-# Splitting data and Loading into DataLoader
+    # initializing network and loading into the trainer
+    trainer, net = net_intialize(ResNetV2(), 'adam', 0.001, 0.9, 0.999, 0.0001)
+
+    ## Training the Model
+    training_results = [] # storing all the variables returned from the train fn.
+    training_results = train(net, batch_size , num_examples=train_size)
+
+    ## Runnning Model on Hold-out Dataset
+    test_acc = test()
+
+    ## Metrics Acquisition
+    get_metrics(training_results[4], training_results[5], training_results[2], training_results[3], training_results[6], batch_size, train_size, cv_size, training_results[7], training_results[1], test_acc)
 
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------------------------#
-
-# IMPORTANT: COMMENT/UNCOMMENT whichever line you need (one will be for full dataset and the other if using for proof of concept)
-
-# train_data, cv_data, test_data, batch_size , train_size, cv_size = data_split_and_load(full_train_ds, test_ds) # UNCOMMENT WHEN USING FULL DATASET
-train_data, cv_data, test_data, batch_size, train_size, cv_size = data_split_and_load(poc_train_ds, test_ds, batch_size = 64) # UNCOMMENT WHEN SHOWING PROOF OF CONCEPT
-
-# ------------------------------------------------------------------------------------------------------------------------------------------------------------------#
-
-
-# initializing network and loading into the trainer
-trainer , net = net_intialize(ResNetV2(), 'adam', 0.001, 0.9, 0.999, 0.0001)
-
-## Training the Model
-training_results = [] # storing all the variables returned from the train fn.
-training_results = train(net, batch_size , num_examples = train_size)
-
-## Runnning Model on Hold-out Dataset
-test_acc = test()
-
-## Metrics Acquisition
-get_metrics(training_results[4], training_results[5], training_results[2], training_results[3], training_results[6], batch_size, train_size, cv_size, training_results[7], training_results[1], test_acc)
-
+if __name__ == "__main__":
+    main()
