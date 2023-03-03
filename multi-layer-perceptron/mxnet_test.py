@@ -46,7 +46,15 @@ import json
 
 # importing the mnist dataset
 from keras.datasets import mnist
- 
+
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--seed", "-s", type=int, default=42, help="Random seed")
+args = parser.parse_args()
+mx.random.seed(args.seed)
+
+print(mx.context.current_context())
 
 ## Data Loading and Pre-processing
 
@@ -219,7 +227,8 @@ metrics = {
 
 print(metrics)
 
-with open('m1-mxnet-mlp.json', 'w') as outfile:
+date_str = time.strftime("%Y-%m-%d-%H%M%S")
+with open(f'./output/m1-mxnet-mlp-{date_str}.json', 'w') as outfile:
     json.dump(metrics, outfile)
 
 
