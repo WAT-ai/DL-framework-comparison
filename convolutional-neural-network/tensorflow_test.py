@@ -75,9 +75,9 @@ class TimingCallback(tf.keras.callbacks.Callback):
         self.start_train_time = 0.0
         self.end_train_time = 0.0
 
-        self.start_batch_interference_list = []
-        self.end_batch_interference_list = []
-        self.difference_batch_interference_list = []
+        self.start_batch_inference_list = []
+        self.end_batch_inference_list = []
+        self.difference_batch_inference_list = []
 
         self.final_training_loss = 0.0
         self.final_evaluation_accuracy = 0.0
@@ -90,13 +90,13 @@ class TimingCallback(tf.keras.callbacks.Callback):
 
     def on_test_batch_begin(self, batch, logs={}):
         self.starttime = time.time()
-        self.start_batch_interference_list.append(self.starttime)
+        self.start_batch_inference_list.append(self.starttime)
 
     def on_test_batch_end(self, batch, logs={}):
         self.endtime = time.time()
-        self.end_batch_interference_list.append(self.endtime)
-        self.difference_batch_interference_list.append(
-            self.end_batch_interference_list[-1] - self.start_batch_interference_list[-1])
+        self.end_batch_inference_list.append(self.endtime)
+        self.difference_batch_inference_list.append(
+            self.end_batch_inference_list[-1] - self.start_batch_inference_list[-1])
 
     def on_epoch_begin(self, epoch, logs={}):
         self.starttime = time.time()
@@ -202,7 +202,7 @@ def main():
 
     total_training_time = cb.end_train_time - cb.start_train_time
     average_epoch_training_time = np.mean(cb.difference_list)
-    average_batch_interference_time = np.mean(cb.difference_batch_interference_list) * 1000
+    average_batch_inference_time = np.mean(cb.difference_batch_inference_list) * 1000
     final_eval_accuracy = history.history["val_sparse_categorical_accuracy"][-1]
     final_train_loss = history.history["loss"][-1]
 
@@ -216,7 +216,7 @@ def main():
         "final_test_accuracy": test_metrics[1],  # Metrics is list of [loss, acc, ce]
         "total_training_time": total_training_time,  # in seconds
         "average_epoch_training_time": average_epoch_training_time,  # in seconds
-        "average_batch_interference_time": average_batch_interference_time  # in milliseconds
+        "average_batch_inference_time": average_batch_inference_time  # in milliseconds
     }
 
     for key, value in metrics.items():
