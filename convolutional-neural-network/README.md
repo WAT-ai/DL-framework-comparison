@@ -1,11 +1,9 @@
 # WAT.ai Python/Julia framework benchmark comparison Project
 ## Milestone 2: ResNetV2-20 on CIFAR-10
 
-### Model Specifications
+### Model: Convolutional Neural Network (CNN)
 
-Model: Convolutional Neural Network (CNN)
-
-Using ResNetV2
+ResNetV2-20 Architecture
 - Input layer: Input size: (32 x 32) x 3
     - conv2d (3 x 3) x 64
 - ResBlock 1: Input size (32 x 32) x 64
