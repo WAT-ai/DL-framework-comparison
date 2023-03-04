@@ -25,6 +25,9 @@ s = ArgParseSettings()
         default = 42
 end
 
+args = parse_args(s)
+Random.seed!(args["seed"])
+
 BATCH_SIZE = 128
 
 # DATA PRE-PROCESSING
