@@ -28,8 +28,8 @@ end
 BATCH_SIZE = 128
 
 # DATA PRE-PROCESSING
-train_data = MLDatasets.CIFAR10(Tx=Float32, split=:train, dir="./data")
-test_data = MLDatasets.CIFAR10(Tx=Float32, split=:test, dir="./data")
+train_data = MLDatasets.CIFAR10(Tx=Float32, split=:train)
+test_data = MLDatasets.CIFAR10(Tx=Float32, split=:test)
 
 train_x = train_data.features;
 train_y = train_data.targets;
@@ -51,10 +51,10 @@ function splitobs(data; at, shuffle::Bool=false)
     return map(idx -> MLDataPattern.getobs(data, idx), splitobs(n, at))
 end
 
-train, val = splitobs((train_x, train_y), at=0.9, shuffle=true);
+train_data, val_data = splitobs((train_x, train_y), at=0.9, shuffle=true);
 
-train_x, train_y = train;
-val_x, val_y = val;
+train_x, train_y = train_data;
+val_x, val_y = val_data;
 
 # Normalize all the data
 
@@ -81,8 +81,8 @@ augmentbatch((X, y)) = (augmentbatch!(outbatch(X), X, pl), y)
 train_batches = mappedarray(augmentbatch, batchview(shuffleobs((train_x_padded, train_y)), size=BATCH_SIZE));
 
 # Test and Validation data
-val_loader = DataLoader((val_x, val_y), shuffle=true, batchsize=BATCH_SIZE);
-test_loader = DataLoader((test_x, test_y), shuffle=true, batchsize=BATCH_SIZE);
+val_loader = DataLoader((val_x, val_y), shuffle=false, batchsize=BATCH_SIZE);
+test_loader = DataLoader((test_x, test_y), shuffle=false, batchsize=BATCH_SIZE);
 
 # RESNET LAYER
 mutable struct ResNetLayer
@@ -213,6 +213,7 @@ end
 
 # Create model with 3 input channels and 10 classes
 model = ResNet20(3, 10);
+model = model |> gpu;  # Move to GPU
 # Setup AdamW optimizer
 β = (0.9, 0.999);
 state = Optimisers.setup(Optimisers.Adam(1e-3, β), model);
@@ -224,8 +225,9 @@ function evaluate(model, test_loader)
         # Get model predictions
         # Note argmax of nd-array gives CartesianIndex
         # Need to grab the first element of each CartesianIndex to get the true index
+        x = x |> gpu
         logits = model(x)
-        ŷ = map(i -> i[1], argmax(logits, dims=1))
+        ŷ = map(i -> i[1] - 1, argmax(logits |> cpu, dims=1))  # Julia indexing starts at 1, subtract 1 from argmax
         append!(preds, ŷ)
 
         # Get true labels
@@ -239,34 +241,37 @@ end
 # Setup timing output
 const to = TimerOutput()
 
-last_loss = 0;
+global last_loss = 0;
 @timeit to "total_training_time" begin
     for epoch in 1:10
         timing_name = epoch > 1 ? "average_epoch_training_time" : "train_jit"
 
         # Create lazily evaluated augmented training data
-        train_batches = mappedarray(augmentbatch, batchview(shuffleobs((train_x_padded, train_y)), size=train_batch_size));
+        train_batches = mappedarray(augmentbatch, batchview(shuffleobs((train_x_padded, train_y)), size=BATCH_SIZE));
 
         @timeit to timing_name begin
             losses = []
             for (x, y) in train_batches
+                x = x |> gpu
+                y = Flux.onehotbatch(y, 0:9) |> gpu
                 val, grads = Flux.withgradient(model) do m
                     # Any code inside here is differentiated.
                     # Evaluation of the model and loss must be inside!
-                    result = m(x)
-                    sparse_logit_cross_entropy(result, y)
+                    logits = m(x)
+                    # sparse_logit_cross_entropy(result, y)
+                    Flux.logitcrossentropy(logits, y)
                 end
                 
                 # Optimiser updates parameters
                 Optimisers.update!(state, model, grads[1])
-                push!(losses, val)
+                push!(losses, val |> cpu)
             end
-            last_loss = mean(losses)
+            global last_loss = mean(losses)
             @info "epoch loss" (mean(losses))
         end
         timing_name = epoch > 1 ? "average_inference_time" : "eval_jit"
         @timeit to timing_name begin
-            acc = evaluate(model, test_loader)
+            acc = evaluate(model, val_loader)
             @info "epoch" acc
         end
     end
@@ -274,15 +279,16 @@ end
 
 # Train time
 # Exclude jit time
-average_epoch_train_time = TimerOutputs.time(to["total_training_time"]["average_epoch_training_time"]) / (9 * 1e9)  # Outputs in nanoseconds, conver to seconds
+average_epoch_train_time = TimerOutputs.time(to["total_training_time"]["average_epoch_training_time"]) / (9 * 1e9)  # Outputs in nanoseconds, convert to seconds
 
 # Eval batch time
 # Exclude jit time
-num_batches = length(test_loader)
-average_eval_batch_time = TimerOutputs.time(to["total_training_time"]["average_inference_time"]) / (9 * 1e6 * num_batches)  # Outputs in nanoseconds, conver to milliseconds
+num_batches = length(val_loader)
+average_eval_batch_time = TimerOutputs.time(to["total_training_time"]["average_inference_time"]) / (9 * 1e6 * num_batches)  # Outputs in nanoseconds, convert to milliseconds
      
 total_train_time = TimerOutputs.time(to["total_training_time"]) / 1e9  # Convert nanos to seconds
-final_eval_accuracy = evaluate(model, test_loader)
+final_eval_accuracy = evaluate(model, val_loader)
+final_test_accuracy = evaluate(model, test_loader)
      
 metrics = Dict(
     "model_name" => "ResNetV2-20",
@@ -293,10 +299,11 @@ metrics = Dict(
     "average_epoch_training_time" => average_epoch_train_time,
     "average_batch_inference_time" => average_eval_batch_time,
     "final_training_loss" => last_loss,
-    "final_evaluation_accuracy" => final_eval_accuracy
+    "final_evaluation_accuracy" => final_eval_accuracy,
+    "final_test_accuracy" => final_test_accuracy
 )
 
 date_str = Dates.format(Dates.now(), "yyyy-mm-dd-HHMMSS")
 open("./output/m2-flux-mlp-$(date_str).json", "w") do f
-    JSON.print(f, json_result)
+    JSON.print(f, metrics)
 end
