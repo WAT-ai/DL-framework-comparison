@@ -1,6 +1,5 @@
 # Data processing
 using MLDatasets;
-using MLUtils: DataLoader;
 using MLDataPattern;
 using ImageCore;
 using Augmentor;
@@ -14,10 +13,23 @@ using Statistics;
 using TimerOutputs;
 using Flux;
 using JSON;
+using Dates;
+using ArgParse;
+
+# Seed arg
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--seed", "-s"
+        help = "Random seed"
+        arg_type = Int
+        default = 42
+end
+
+BATCH_SIZE = 128
 
 # DATA PRE-PROCESSING
-train_data = MLDatasets.CIFAR10(Tx=Float32, split=:train)
-test_data = MLDatasets.CIFAR10(Tx=Float32, split=:test)
+train_data = MLDatasets.CIFAR10(Tx=Float32, split=:train, dir="./data")
+test_data = MLDatasets.CIFAR10(Tx=Float32, split=:test, dir="./data")
 
 train_x = train_data.features;
 train_y = train_data.targets;
@@ -55,12 +67,6 @@ train_x = Array{Float32}(normalize(train_x));
 val_x = Array{Float32}(normalize(val_x));
 test_x = Array{Float32}(normalize(test_x));
 
-# Notebook testing: Use less data
-train_x, train_y = MLDatasets.getobs((train_x, train_y), 1:500);
-
-val_x, val_y = MLDatasets.getobs((val_x, val_y), 1:50);
-
-test_x, test_y = MLDatasets.getobs((test_x, test_y), 1:50);
 
 # DATA AUGMENTATION PIPELINE
 # Pad the training data for further augmentation
@@ -70,15 +76,13 @@ pl = PermuteDims((3, 1, 2)) |> CombineChannels(RGB) |> Either(FlipX(), NoOp()) |
 outbatch(X) = Array{Float32}(undef, (32, 32, 3, nobs(X)))
 # Function that takes a batch (images and targets) and augments the images
 augmentbatch((X, y)) = (augmentbatch!(outbatch(X), X, pl), y)
+
 # Shuffled and batched dataset of augmented images
-train_batch_size = 16
+train_batches = mappedarray(augmentbatch, batchview(shuffleobs((train_x_padded, train_y)), size=BATCH_SIZE));
 
-train_batches = mappedarray(augmentbatch, batchview(shuffleobs((train_x_padded, train_y)), size=train_batch_size));
 # Test and Validation data
-test_batch_size = 32
-
-val_loader = DataLoader((val_x, val_y), shuffle=true, batchsize=test_batch_size);
-test_loader = DataLoader((test_x, test_y), shuffle=true, batchsize=test_batch_size);
+val_loader = DataLoader((val_x, val_y), shuffle=true, batchsize=BATCH_SIZE);
+test_loader = DataLoader((test_x, test_y), shuffle=true, batchsize=BATCH_SIZE);
 
 # RESNET LAYER
 mutable struct ResNetLayer
@@ -90,9 +94,6 @@ mutable struct ResNetLayer
     in_channels::Int
     channels::Int
     stride::Int
-    # stride2::Int
-    # pad1::Int
-    # pad2::Int
 end
 
 @functor ResNetLayer (conv1, conv2, bn1, bn2)
@@ -296,6 +297,7 @@ metrics = Dict(
     "final_evaluation_accuracy" => final_eval_accuracy
 )
 
-open("m2-flux-cnn.json","w") do f
-    JSON.print(f, metrics)
+date_str = Dates.format(Dates.now(), "yyyy-mm-dd-HHMMSS")
+open("./output/m2-flux-mlp-$(date_str).json", "w") do f
+    JSON.print(f, json_result)
 end
