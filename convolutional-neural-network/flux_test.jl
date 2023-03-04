@@ -215,8 +215,7 @@ end
 model = ResNet20(3, 10);
 # Setup AdamW optimizer
 β = (0.9, 0.999);
-decay = 1e-4;
-state = Optimisers.setup(Optimisers.Adam(1e-3, β, decay), model);
+state = Optimisers.setup(Optimisers.Adam(1e-3, β), model);
 
 function evaluate(model, test_loader)
     preds = []
