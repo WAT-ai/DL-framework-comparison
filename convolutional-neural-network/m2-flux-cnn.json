@@ -1,0 +1,1 @@
+{"task":"classification","framework_name":"Flux.jl","final_evaluation_accuracy":0.08,"total_training_time":178.5516411,"average_epoch_training_time":11.372611733333333,"final_training_loss":0,"model_name":"ResNetV2-20","dataset":"CIFAR-10","average_batch_inference_time":149.16285}
